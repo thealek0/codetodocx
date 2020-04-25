@@ -1,6 +1,7 @@
 const fs = require("fs");
 const util = require("util");
 const path = require("path");
+const args = require("args-parser")(process.argv)
 const recursiveReaddir = require("recursive-readdir");
 const { Paragraph, Packer, Document, TextRun, HeadingLevel } = require("docx");
 
@@ -8,16 +9,22 @@ const readDirRecursive = util.promisify(recursiveReaddir);
 const fsReadFile = util.promisify(fs.readFile);
 const fsWriteFile = util.promisify(fs.writeFile);
 
-const INCLUDE = [".js"];
-const EXCLUDE = ["node_modules/*"];
-const ROOT_DIR = ".";
+if (!args.dir) {
+  console.warn('--dir is required');
+  process.exit(0);
+}
+
+const INCLUDE_EXT = args.includeExt && args.includeExt.split(',') || [];
+const EXCLUDE_DIR = args.excludeDir && args.excludeDir.split(',') || [];
+const ROOT_DIR = args.dir;
+const EXCLUDE_PART_PATH = args.excludePartPath || '';
 
 async function processing() {
   try {
     const paths = await readDirRecursive(ROOT_DIR, [
-      ...EXCLUDE,
+      ...EXCLUDE_DIR,
       function (file, stats) {
-        return stats.isFile() && !INCLUDE.includes(path.extname(file));
+        return stats.isFile() && !INCLUDE_EXT.includes(path.extname(file));
       },
     ]);
 
@@ -25,7 +32,7 @@ async function processing() {
       paths.map(async (path) => {
         const code = await fsReadFile(path, "utf8");
         return {
-          path,
+          path: path.replace(EXCLUDE_PART_PATH, ''),
           code,
         };
       })
